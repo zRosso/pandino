@@ -13,98 +13,96 @@ export default function Summary({ trip, passengers, onBack, onConfirm }: Props) 
   const costs = calculateCosts(trip, passengers);
   const { usedL, usedKg } = calcTrunkUsage(passengers);
   const pct = trunkPercentage(usedL);
-
-  function handleConfirm() {
-    // id, createdAt, userId, userName vengono aggiunti in App.tsx
-    onConfirm({ id: '', trip, passengers, createdAt: '', userId: '', userName: '' });
-  }
+  const tripDate = new Date(trip.date).toLocaleDateString('it-IT', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
 
   return (
-    <div className="step-card max-w-xl mx-auto">
-      <h2 className="text-2xl font-bold text-white mb-1">Riepilogo prenotazione</h2>
-      <p className="text-slate-400 mb-6 text-sm">Controlla tutti i dettagli prima di confermare</p>
+    <div className="card">
+      <h2 className="text-xl font-bold text-white mb-1">Riepilogo</h2>
+      <p className="text-slate-500 text-sm mb-6">Controlla tutto prima di confermare</p>
 
-      {/* Trip info */}
-      <div className="bg-slate-800/50 rounded-xl p-4 mb-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="text-2xl">🚗</div>
-          <div>
-            <p className="font-bold text-white text-lg">
-              {trip.from} <span className="text-red-400">→</span> {trip.to}
+      {/* Trip */}
+      <div className="card-inner mb-4">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-xl bg-red-600/20 border border-red-600/30 flex items-center justify-center shrink-0 mt-0.5">
+            <span className="text-base">🚗</span>
+          </div>
+          <div className="min-w-0">
+            <p className="font-bold text-white text-base leading-tight">
+              {trip.from} <span className="text-red-500">→</span> {trip.to}
             </p>
-            <p className="text-slate-400 text-sm">
-              {new Date(trip.date).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} ore {trip.time}
-            </p>
+            <p className="text-slate-500 text-sm mt-0.5">{tripDate} · {trip.time}</p>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-700/60">
           <Stat label="Distanza" value={`${trip.distanceKm} km`} />
-          <Stat label="Benzina" value={`${trip.fuelPricePerLiter.toFixed(2)} €/L`} />
           <Stat label="Passeggeri" value={`${passengers.length}`} />
-          <Stat label="Consumi Panda" value={`${PANDA_SPECS.fuelConsumptionL100km} L/100km`} />
+          <Stat label="Benzina" value={`${trip.fuelPricePerLiter.toFixed(2)} €/L`} />
         </div>
       </div>
 
-      {/* Passengers & luggage */}
-      <div className="bg-slate-800/50 rounded-xl p-4 mb-4">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Posti e bagagli</p>
-        <div className="space-y-2">
-          {passengers.map((p) => {
-            const lug = LUGGAGE_OPTIONS.find((o) => o.size === p.luggage)!;
+      {/* Seats & luggage */}
+      <div className="card-inner mb-4">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Posti e bagagli</p>
+        <div className="space-y-2.5">
+          {passengers.map(p => {
+            const lug = LUGGAGE_OPTIONS.find(o => o.size === p.luggage)!;
             return (
-              <div key={p.seat} className="flex items-center justify-between text-sm">
-                <span className="text-slate-300">🪑 {SEAT_LABELS[p.seat]}</span>
-                <span className="text-slate-400">
+              <div key={p.seat} className="flex items-center justify-between">
+                <span className="text-sm text-slate-300">🪑 {SEAT_LABELS[p.seat]}</span>
+                <span className="text-sm text-slate-400">
                   {lug.emoji} {lug.label}
-                  {lug.size !== 'none' && <span className="text-slate-500 text-xs"> ({lug.volumeL} L)</span>}
+                  {lug.size !== 'none' && <span className="text-slate-600 text-xs ml-1">({lug.volumeL} L)</span>}
                 </span>
               </div>
             );
           })}
         </div>
-        <div className="border-t border-slate-700 mt-3 pt-3">
-          <div className="flex justify-between text-xs text-slate-500">
-            <span>Portabagagli usato</span>
-            <span className="text-slate-300">{usedL} / 225 L ({pct}%) · {usedKg} kg</span>
-          </div>
+        <div className="flex justify-between text-xs text-slate-600 mt-3 pt-3 border-t border-slate-700/60">
+          <span>Portabagagli</span>
+          <span>{usedL} / 225 L ({pct}%) · {usedKg} kg</span>
         </div>
       </div>
 
       {/* Cost breakdown */}
-      <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Costi del viaggio</p>
-        <div className="space-y-2 text-sm">
+      <div className="card-inner mb-6">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Costi</p>
+        <div className="space-y-2.5">
           <CostRow
-            label={`Benzina (${costs.fuelLitersNeeded.toFixed(1)} L × ${trip.fuelPricePerLiter.toFixed(2)} €)`}
-            value={formatEuro(costs.fuelCostTotal)}
-            sub="carburante necessario per il viaggio"
-          />
+            label="Carburante"
+            sub={`${costs.fuelLitersNeeded.toFixed(1)} L × ${trip.fuelPricePerLiter.toFixed(2)} €`}
+            value={formatEuro(costs.fuelCostTotal)} />
           <CostRow
-            label={`Usura veicolo (${trip.distanceKm} km × 0.12 €)`}
-            value={formatEuro(costs.wearCostTotal)}
-            sub="ammortamento, gomme, olio, manutenzione"
-          />
-          <div className="border-t border-slate-700 pt-2 mt-2">
+            label="Usura veicolo"
+            sub={`${trip.distanceKm} km × ${PANDA_SPECS.wearCostPerKm} €`}
+            value={formatEuro(costs.wearCostTotal)} />
+          <div className="border-t border-slate-700/60 pt-2.5">
             <CostRow label="Totale viaggio" value={formatEuro(costs.totalCost)} bold />
           </div>
-          <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-3 mt-2">
-            <div className="flex justify-between items-center">
-              <span className="font-bold text-white">Costo per passeggero</span>
-              <span className="text-2xl font-black text-red-400">{formatEuro(costs.costPerPassenger)}</span>
+        </div>
+
+        {/* Per-passenger highlight */}
+        <div className="mt-4 bg-red-950/40 border border-red-900/60 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">Quota per passeggero</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                totale ÷ {passengers.length} {passengers.length === 1 ? 'passeggero' : 'passeggeri'}
+              </p>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Totale ÷ {passengers.length} passeggeri (escludi il guidatore)
-            </p>
+            <p className="text-3xl font-black text-red-400 tabular-nums">{formatEuro(costs.costPerPassenger)}</p>
           </div>
         </div>
       </div>
 
       <div className="flex gap-3">
-        <button onClick={onBack} className="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-medium py-3 rounded-xl transition-colors">
-          ← Modifica
-        </button>
-        <button onClick={handleConfirm} className="flex-2 flex-grow bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-6 rounded-xl transition-colors">
-          ✓ Conferma prenotazione
+        <button onClick={onBack} className="btn-secondary flex-1">← Modifica</button>
+        <button
+          onClick={() => onConfirm({ id: '', trip, passengers, createdAt: '', userId: '', userName: '' })}
+          className="btn-primary flex-1"
+        >
+          ✓ Conferma
         </button>
       </div>
     </div>
@@ -114,20 +112,20 @@ export default function Summary({ trip, passengers, onBack, onConfirm }: Props) 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-slate-500 text-xs">{label}</p>
-      <p className="text-white font-medium">{value}</p>
+      <p className="text-slate-600 text-xs mb-0.5">{label}</p>
+      <p className="text-white text-sm font-semibold">{value}</p>
     </div>
   );
 }
 
-function CostRow({ label, value, sub, bold }: { label: string; value: string; sub?: string; bold?: boolean }) {
+function CostRow({ label, sub, value, bold }: { label: string; sub?: string; value: string; bold?: boolean }) {
   return (
-    <div className="flex justify-between items-start">
+    <div className="flex items-start justify-between gap-4">
       <div>
-        <span className={bold ? 'font-bold text-white' : 'text-slate-300'}>{label}</span>
-        {sub && <p className="text-xs text-slate-500">{sub}</p>}
+        <p className={bold ? 'text-sm font-semibold text-white' : 'text-sm text-slate-300'}>{label}</p>
+        {sub && <p className="text-xs text-slate-600">{sub}</p>}
       </div>
-      <span className={bold ? 'font-bold text-white' : 'text-slate-200'}>{value}</span>
+      <p className={bold ? 'text-sm font-semibold text-white tabular-nums' : 'text-sm text-slate-200 tabular-nums shrink-0'}>{value}</p>
     </div>
   );
 }
