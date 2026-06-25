@@ -111,25 +111,25 @@ export default function TripForm({ onSubmit }: Props) {
           {errors.distanceKm && <p className="text-red-400 text-xs mt-1">{errors.distanceKm}</p>}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 min-w-0">
             <label className="block text-sm font-medium text-slate-300 mb-1">Data</label>
             <input
               type="date"
               value={date}
               min={today}
               onChange={(e) => setDate(e.target.value)}
-              className="input-field"
+              className="input-field w-full"
             />
             {errors.date && <p className="text-red-400 text-xs mt-1">{errors.date}</p>}
           </div>
-          <div>
+          <div className="sm:w-40 min-w-0">
             <label className="block text-sm font-medium text-slate-300 mb-1">Orario</label>
             <input
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              className="input-field"
+              className="input-field w-full"
             />
           </div>
         </div>
