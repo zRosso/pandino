@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/fuel-price.ts": {
+      "regions": ["cdg1"]
+    }
+  }
+}
