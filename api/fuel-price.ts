@@ -4,7 +4,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? '';
 const FALLBACK_PRICE = 1.89;
 
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
-  res.setHeader('Cache-Control', 'public, s-maxage=14400, stale-while-revalidate=3600');
+  res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
   if (!GEMINI_API_KEY) {

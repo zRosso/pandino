@@ -23,9 +23,11 @@
     display: block;
   }
 
-  /* iOS dark mode per input nativi + previeni overflow del min-width intrinseco */
+  /* Forza stile custom su date/time (altrimenti iOS sovrascrive bg, border, radius) */
   input[type="date"], input[type="time"] {
     color-scheme: dark;
+    -webkit-appearance: none;
+    appearance: none;
     min-width: 0;
     max-width: 100%;
     width: 100%;
@@ -66,14 +68,21 @@
   /* ── Form inputs ──
      font-size >= 16px previene lo zoom automatico su iOS Safari */
   .input-field {
-    @apply w-full bg-slate-800 border border-slate-700 rounded-xl px-4
+    @apply w-full bg-slate-800 border border-slate-700 rounded-xl
            text-white placeholder-slate-500
            focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/50
            transition-all duration-150;
-    font-size: 1rem;
-    min-height: 48px;
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
+    font-size: 1rem;     /* ← MOBILE: dimensione testo */
+    min-height: 48px;    /* ← MOBILE: altezza minima */
+    padding: 0.75rem 1rem; /* ← MOBILE: spaziatura interna (verticale orizzontale) */
+  }
+  /* ── Input — dimensioni DESKTOP (≥640px) ── */
+  @media (min-width: 640px) {
+    .input-field {
+      font-size: 0.875rem; /* ← DESKTOP: testo più piccolo */
+      min-height: 44px;    /* ← DESKTOP: altezza */
+      padding: 0.75rem 1rem;
+    }
   }
 
   /* ── Buttons — min-height 52px per touch target comodo ── */
