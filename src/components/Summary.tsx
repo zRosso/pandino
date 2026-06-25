@@ -1,6 +1,6 @@
 import type { Booking, Passenger, Trip } from '../types';
 import { LUGGAGE_OPTIONS, PANDA_SPECS, SEAT_LABELS } from '../types';
-import { calculateCosts, calcTrunkUsage, formatEuro, generateId, trunkPercentage } from '../utils';
+import { calculateCosts, calcTrunkUsage, formatEuro, trunkPercentage } from '../utils';
 
 interface Props {
   trip: Trip;
@@ -15,13 +15,8 @@ export default function Summary({ trip, passengers, onBack, onConfirm }: Props) 
   const pct = trunkPercentage(usedL);
 
   function handleConfirm() {
-    const booking: Booking = {
-      id: generateId(),
-      trip,
-      passengers,
-      createdAt: new Date().toISOString(),
-    };
-    onConfirm(booking);
+    // id, createdAt, userId, userName vengono aggiunti in App.tsx
+    onConfirm({ id: '', trip, passengers, createdAt: '', userId: '', userName: '' });
   }
 
   return (

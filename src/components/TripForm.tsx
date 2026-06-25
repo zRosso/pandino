@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { Trip } from '../types';
-import { generateId } from '../utils';
+import type { PlaceResult, Trip } from '../types';
+import { generateId, getRouteDistanceKm } from '../utils';
+import PlaceAutocomplete from './PlaceAutocomplete';
 
 interface Props {
   onSubmit: (trip: Trip) => void;
@@ -9,26 +10,47 @@ interface Props {
 export default function TripForm({ onSubmit }: Props) {
   const today = new Date().toISOString().split('T')[0];
 
-  const [form, setForm] = useState({
-    from: '',
-    to: '',
-    date: today,
-    time: '09:00',
-    distanceKm: '',
-    fuelPricePerLiter: '1.85',
-  });
-
+  const [fromPlace, setFromPlace] = useState<PlaceResult | null>(null);
+  const [toPlace, setToPlace] = useState<PlaceResult | null>(null);
+  const [date, setDate] = useState(today);
+  const [time, setTime] = useState('09:00');
+  const [distanceKm, setDistanceKm] = useState('');
+  const [fuelPrice, setFuelPrice] = useState('1.89');
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  async function handlePlaceSelect(field: 'from' | 'to', place: PlaceResult) {
+    const other = field === 'from' ? toPlace : fromPlace;
+    if (field === 'from') setFromPlace(place);
+    else setToPlace(place);
+
+    if (other) {
+      const from = field === 'from' ? place : fromPlace!;
+      const to = field === 'to' ? place : toPlace!;
+      setRouteLoading(true);
+      setRouteError('');
+      setDistanceKm('');
+      try {
+        const km = await getRouteDistanceKm(from, to);
+        setDistanceKm(String(km));
+      } catch {
+        setRouteError('Impossibile calcolare il percorso — inserisci i km manualmente');
+      } finally {
+        setRouteLoading(false);
+      }
+    }
+  }
 
   function validate() {
     const e: Record<string, string> = {};
-    if (!form.from.trim()) e.from = 'Inserisci la partenza';
-    if (!form.to.trim()) e.to = 'Inserisci la destinazione';
-    if (!form.date) e.date = 'Inserisci la data';
-    const dist = parseFloat(form.distanceKm);
-    if (isNaN(dist) || dist <= 0) e.distanceKm = 'Inserisci una distanza valida';
-    const fuel = parseFloat(form.fuelPricePerLiter);
-    if (isNaN(fuel) || fuel <= 0) e.fuelPricePerLiter = 'Inserisci un prezzo valido';
+    if (!fromPlace) e.from = 'Seleziona la partenza dalla lista';
+    if (!toPlace) e.to = 'Seleziona la destinazione dalla lista';
+    if (!date) e.date = 'Inserisci la data';
+    const dist = parseFloat(distanceKm);
+    if (isNaN(dist) || dist <= 0) e.distanceKm = 'Distanza non disponibile — inseriscila manualmente';
+    const fuel = parseFloat(fuelPrice);
+    if (isNaN(fuel) || fuel <= 0) e.fuelPrice = 'Prezzo non valido';
     return e;
   }
 
@@ -38,18 +60,13 @@ export default function TripForm({ onSubmit }: Props) {
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     onSubmit({
       id: generateId(),
-      from: form.from.trim(),
-      to: form.to.trim(),
-      date: form.date,
-      time: form.time,
-      distanceKm: parseFloat(form.distanceKm),
-      fuelPricePerLiter: parseFloat(form.fuelPricePerLiter),
+      from: fromPlace!.displayName.split(',').slice(0, 2).join(',').trim(),
+      to: toPlace!.displayName.split(',').slice(0, 2).join(',').trim(),
+      date,
+      time,
+      distanceKm: parseFloat(distanceKm),
+      fuelPricePerLiter: parseFloat(fuelPrice),
     });
-  }
-
-  function set(field: string, value: string) {
-    setForm((f) => ({ ...f, [field]: value }));
-    setErrors((e) => { const c = { ...e }; delete c[field]; return c; });
   }
 
   return (
@@ -58,90 +75,94 @@ export default function TripForm({ onSubmit }: Props) {
       <p className="text-slate-400 mb-6 text-sm">Configura il tuo viaggio sulla Panda Cross 2023</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Da" error={errors.from}>
-            <input
-              type="text"
-              value={form.from}
-              onChange={(e) => set('from', e.target.value)}
-              placeholder="Es. Milano"
-              className="input-field"
-            />
-          </Field>
-          <Field label="A" error={errors.to}>
-            <input
-              type="text"
-              value={form.to}
-              onChange={(e) => set('to', e.target.value)}
-              placeholder="Es. Roma"
-              className="input-field"
-            />
-          </Field>
+        <PlaceAutocomplete
+          label="Da"
+          placeholder="Es. Milano, Piazza Duomo"
+          onSelect={(p) => handlePlaceSelect('from', p)}
+          error={errors.from}
+        />
+        <PlaceAutocomplete
+          label="A"
+          placeholder="Es. Roma, Colosseo"
+          onSelect={(p) => handlePlaceSelect('to', p)}
+          error={errors.to}
+        />
+
+        {/* Distanza calcolata automaticamente */}
+        <div className="bg-slate-800/60 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm font-medium text-slate-300">Distanza stradale (km)</label>
+            {routeLoading && (
+              <span className="text-xs text-slate-400 animate-pulse">⏳ Calcolo percorso...</span>
+            )}
+            {!routeLoading && distanceKm && (
+              <span className="text-xs text-green-400">✓ Calcolata via OpenStreetMap</span>
+            )}
+          </div>
+          <input
+            type="number"
+            value={distanceKm}
+            onChange={(e) => setDistanceKm(e.target.value)}
+            placeholder="Seleziona partenza e destinazione..."
+            min="1"
+            className="input-field"
+          />
+          {routeError && <p className="text-yellow-400 text-xs mt-1">{routeError}</p>}
+          {errors.distanceKm && <p className="text-red-400 text-xs mt-1">{errors.distanceKm}</p>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Data" error={errors.date}>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Data</label>
             <input
               type="date"
-              value={form.date}
+              value={date}
               min={today}
-              onChange={(e) => set('date', e.target.value)}
+              onChange={(e) => setDate(e.target.value)}
               className="input-field"
             />
-          </Field>
-          <Field label="Orario">
+            {errors.date && <p className="text-red-400 text-xs mt-1">{errors.date}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Orario</label>
             <input
               type="time"
-              value={form.time}
-              onChange={(e) => set('time', e.target.value)}
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
               className="input-field"
             />
-          </Field>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Distanza (km)" error={errors.distanceKm}>
-            <input
-              type="number"
-              value={form.distanceKm}
-              onChange={(e) => set('distanceKm', e.target.value)}
-              placeholder="Es. 120"
-              min="1"
-              className="input-field"
-            />
-          </Field>
-          <Field label="Prezzo benzina (€/L)" error={errors.fuelPricePerLiter}>
-            <input
-              type="number"
-              value={form.fuelPricePerLiter}
-              onChange={(e) => set('fuelPricePerLiter', e.target.value)}
-              placeholder="Es. 1.85"
-              min="0.5"
-              step="0.01"
-              className="input-field"
-            />
-          </Field>
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-1">
+            Prezzo benzina (€/L)
+          </label>
+          <input
+            type="number"
+            value={fuelPrice}
+            onChange={(e) => setFuelPrice(e.target.value)}
+            min="0.5"
+            step="0.01"
+            className="input-field"
+          />
+          <p className="text-xs text-slate-500 mt-1">Media Italia attuale — aggiorna se conosci il prezzo esatto</p>
+          {errors.fuelPrice && <p className="text-red-400 text-xs mt-1">{errors.fuelPrice}</p>}
         </div>
 
-        <div className="bg-slate-800/50 rounded-xl p-4 text-sm text-slate-400 mt-2">
+        <div className="bg-slate-800/50 rounded-xl p-3 text-sm text-slate-400">
           <span className="text-slate-300 font-medium">Panda Cross 2023 — </span>
-          consumo medio 5.5 L/100km · usura veicolo 0.12 €/km
+          5.5 L/100km · usura 0.12 €/km
         </div>
 
-        <button type="submit" className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-6 rounded-xl transition-colors mt-2">
+        <button
+          type="submit"
+          disabled={routeLoading}
+          className="w-full bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-3 px-6 rounded-xl transition-colors"
+        >
           Continua → Selezione posti
         </button>
       </form>
-    </div>
-  );
-}
-
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-slate-300 mb-1">{label}</label>
-      {children}
-      {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
     </div>
   );
 }

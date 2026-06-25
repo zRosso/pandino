@@ -32,6 +32,8 @@ export interface Booking {
   trip: Trip;
   passengers: Passenger[];
   createdAt: string;
+  userId: string;
+  userName: string;
 }
 
 export interface CostBreakdown {
@@ -42,12 +44,18 @@ export interface CostBreakdown {
   fuelLitersNeeded: number;
 }
 
+export interface PlaceResult {
+  displayName: string;
+  lat: number;
+  lon: number;
+}
+
 // Panda Cross 2023 specs
 export const PANDA_SPECS = {
   trunkLiters: 225,
   trunkMaxWeightKg: 50,
-  fuelConsumptionL100km: 5.5, // combined city+highway
-  wearCostPerKm: 0.12,        // depreciation + tyres + oil + maintenance
+  fuelConsumptionL100km: 5.5,
+  wearCostPerKm: 0.12,
 };
 
 export const LUGGAGE_OPTIONS: LuggageOption[] = [
