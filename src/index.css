@@ -23,9 +23,12 @@
     display: block;
   }
 
-  /* iOS dark mode per input nativi */
+  /* iOS dark mode per input nativi + previeni overflow del min-width intrinseco */
   input[type="date"], input[type="time"] {
     color-scheme: dark;
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
   }
 
   /* Elimina il 300ms tap-delay su mobile */
