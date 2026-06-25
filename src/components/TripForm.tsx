@@ -121,14 +121,14 @@ export default function TripForm({ onSubmit }: Props) {
         </div>
 
         {/* Data e Orario */}
-        <div className="grid gap-3" style={{ gridTemplateColumns: '1fr 110px' }}>
-          <div className="min-w-0">
+        <div className="flex flex-col gap-3">
+          <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">Data</label>
             <input type="date" value={date} min={today} onChange={e => setDate(e.target.value)}
               className="input-field" />
             {errors.date && <p className="text-red-400 text-xs mt-1.5">{errors.date}</p>}
           </div>
-          <div className="min-w-0">
+          <div>
             <label className="block text-sm font-medium text-slate-300 mb-1.5">Orario</label>
             <input type="time" value={time} onChange={e => setTime(e.target.value)}
               className="input-field" />
