@@ -35,7 +35,7 @@ export default function Summary({ trip, passengers, onBack, onConfirm }: Props) 
             <p className="text-slate-500 text-sm mt-0.5">{tripDate} · {trip.time}</p>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-700/60">
+        <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-700/60">
           <Stat label="Distanza" value={`${trip.distanceKm} km`} />
           <Stat label="Passeggeri" value={`${passengers.length}`} />
           <Stat label="Benzina" value={`${trip.fuelPricePerLiter.toFixed(2)} €/L`} />

@@ -8,10 +8,12 @@
   html { height: 100%; }
 
   body {
-    @apply bg-slate-950 text-white min-h-screen m-0;
+    @apply bg-slate-950 text-white m-0;
+    min-height: 100dvh;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
   }
 
   #root {
@@ -19,12 +21,16 @@
     width: 100%;
     max-width: 100%;
     display: block;
-    text-align: left;
-    border: none;
   }
 
+  /* iOS dark mode per input nativi */
   input[type="date"], input[type="time"] {
     color-scheme: dark;
+  }
+
+  /* Elimina il 300ms tap-delay su mobile */
+  button, a, input, select, textarea {
+    touch-action: manipulation;
   }
 }
 
@@ -54,25 +60,34 @@
     @apply bg-slate-800/60 rounded-xl p-4;
   }
 
-  /* ── Form inputs ── */
+  /* ── Form inputs ──
+     font-size >= 16px previene lo zoom automatico su iOS Safari */
   .input-field {
-    @apply w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3
-           text-white placeholder-slate-500 text-sm
+    @apply w-full bg-slate-800 border border-slate-700 rounded-xl px-4
+           text-white placeholder-slate-500
            focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/50
            transition-all duration-150;
+    font-size: 1rem;
+    min-height: 48px;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
   }
 
-  /* ── Buttons ── */
+  /* ── Buttons — min-height 52px per touch target comodo ── */
   .btn-primary {
     @apply w-full bg-red-600 hover:bg-red-500 active:bg-red-700
-           text-white font-semibold py-3.5 px-6 rounded-xl
+           text-white font-semibold px-6 rounded-xl
            transition-all duration-150 disabled:bg-slate-800
            disabled:text-slate-500 disabled:cursor-not-allowed;
+    font-size: 1rem;
+    min-height: 52px;
   }
   .btn-secondary {
     @apply w-full bg-slate-800 hover:bg-slate-700 active:bg-slate-900
-           text-white font-medium py-3.5 px-6 rounded-xl
+           text-white font-medium px-6 rounded-xl
            transition-all duration-150 border border-slate-700;
+    font-size: 1rem;
+    min-height: 52px;
   }
 
   /* ── Page wrapper ── */

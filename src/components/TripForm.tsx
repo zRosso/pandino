@@ -6,7 +6,7 @@ import PlaceAutocomplete from './PlaceAutocomplete';
 interface FuelData {
   price: number;
   source: string;
-  stationsCount: number;
+  stationsCount?: number;
   updatedAt: string;
 }
 
@@ -30,19 +30,19 @@ export default function TripForm({ onSubmit }: Props) {
   const [fuelLoading, setFuelLoading] = useState(true);
   const [fuelError,   setFuelError]   = useState('');
 
-  // Fetch prezzo benzina ufficiale MIMIT all'apertura del form
+  // Fetch prezzo benzina in tempo reale via Gemini AI
   useEffect(() => {
     fetch('/api/fuel-price')
       .then(r => r.json())
       .then((data: FuelData) => {
         setFuel(data);
         if (data.source === 'default') {
-          setFuelError('Fonte MIMIT non raggiungibile — uso prezzo medio di riferimento');
+          setFuelError('Prezzo in tempo reale non disponibile — uso prezzo medio di riferimento');
         }
       })
       .catch(() => {
-        setFuel({ price: 1.89, source: 'default', stationsCount: 0, updatedAt: '' });
-        setFuelError('Impossibile ottenere il prezzo ufficiale — uso prezzo medio di riferimento');
+        setFuel({ price: 1.89, source: 'default', updatedAt: '' });
+        setFuelError('Impossibile ottenere il prezzo — uso prezzo medio di riferimento');
       })
       .finally(() => setFuelLoading(false));
   }, []);
@@ -146,7 +146,7 @@ export default function TripForm({ onSubmit }: Props) {
               </div>
             ) : fuelOk ? (
               <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
-                <span>✓</span> MIMIT ufficiale
+                <span>✓</span> AI · Realtime
               </span>
             ) : (
               <span className="text-xs text-amber-400">⚠ stima</span>
@@ -161,15 +161,15 @@ export default function TripForm({ onSubmit }: Props) {
                 <p className="text-2xl font-black text-white tabular-nums">
                   {fuel?.price.toFixed(3)} <span className="text-base font-medium text-slate-400">€/L</span>
                 </p>
-                {fuelOk && fuel?.stationsCount > 0 && (
+                {fuelOk && (
                   <p className="text-xs text-slate-600 mt-0.5">
-                    Media su {fuel.stationsCount.toLocaleString('it-IT')} stazioni · self-service
+                    Rilevato in tempo reale · self-service
                   </p>
                 )}
               </div>
               <div className="text-right">
                 <p className="text-xs text-slate-600 leading-tight">Non modificabile</p>
-                <p className="text-xs text-slate-700 leading-tight">Fonte: MIMIT</p>
+                <p className="text-xs text-slate-700 leading-tight">Fonte: Gemini AI</p>
               </div>
             </div>
           )}

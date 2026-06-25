@@ -1,135 +1,97 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Fonte ufficiale: MIMIT "Osservaprezzi Carburanti" — rilevazione giornaliera alle 8:00
-// NB: dal 10/02/2026 il separatore è cambiato da ";" a "|" — auto-rilevato dal codice
-const MIMIT_URLS = [
-  'https://www.mimit.gov.it/images/exportCSV/prezzo_alle_8.csv',
-  'https://www.mise.gov.it/images/exportCSV/prezzo_alle_8.csv',
-];
-
-// Headers che simulano un browser reale (alcuni server gov bloccano user-agent automatici)
-const BROWSER_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language': 'it-IT,it;q=0.9,en;q=0.5',
-  'Accept-Encoding': 'gzip, deflate, br',
-  'Connection': 'keep-alive',
-};
-
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY ?? '';
 const FALLBACK_PRICE = 1.89;
 
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'public, s-maxage=14400, stale-while-revalidate=3600');
   res.setHeader('Access-Control-Allow-Origin', '*');
 
+  if (!GEMINI_API_KEY) {
+    console.warn('[fuel-price] GEMINI_API_KEY non configurata');
+    return res.json({
+      price: FALLBACK_PRICE,
+      source: 'default',
+      error: 'API key mancante — configurare GEMINI_API_KEY su Vercel',
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
   try {
-    const { price, stationsCount, separator } = await fetchMIMITAverage();
+    const price = await fetchPriceWithGemini();
     res.json({
       price,
-      source: 'MIMIT — Osservaprezzi Carburanti',
-      stationsCount,
-      separator,
+      source: 'Gemini AI · Google Search',
       updatedAt: new Date().toISOString(),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[fuel-price] Fetch fallita:', msg);
+    console.error('[fuel-price] Errore Gemini:', msg);
     res.json({
       price: FALLBACK_PRICE,
       source: 'default',
-      stationsCount: 0,
       error: msg,
       updatedAt: new Date().toISOString(),
     });
   }
 }
 
-async function fetchMIMITAverage(): Promise<{ price: number; stationsCount: number; separator: string }> {
-  let csvText: string | null = null;
-  let lastError = '';
+async function fetchPriceWithGemini(): Promise<number> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-  for (const url of MIMIT_URLS) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15_000);
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: BROWSER_HEADERS,
-        redirect: 'follow',
-      });
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        lastError = `HTTP ${response.status} da ${url}`;
-        continue;
-      }
-
-      const buffer = await response.arrayBuffer();
-      // Il file usa ISO-8859-1 / Windows-1252 (caratteri italiani)
-      csvText = new TextDecoder('iso-8859-1').decode(buffer);
-      break;
-    } catch (e) {
-      lastError = e instanceof Error ? e.message : String(e);
-    }
-  }
-
-  if (!csvText) throw new Error(`Nessuna fonte raggiungibile. Ultimo errore: ${lastError}`);
-
-  const lines = csvText.split('\n');
-  if (lines.length < 2) throw new Error('CSV vuoto o non valido');
-
-  // --- Auto-rileva il separatore (MIMIT ha cambiato da ";" a "|" il 10/02/2026) ---
-  const rawHeader = lines[0].replace(/\r/g, '');
-  const separator = rawHeader.includes('|') ? '|' : ';';
-
-  const header   = rawHeader.split(separator).map(h => h.trim().toLowerCase());
-  const iType    = header.findIndex(h => h.includes('carburante'));
-  const iPrice   = header.findIndex(h => h.includes('prezzo'));
-  const iSelf    = header.findIndex(h => h === 'self' || h.includes('self'));
-
-  if (iType < 0 || iPrice < 0) {
-    throw new Error(`Formato CSV non riconosciuto (sep="${separator}"). Header: [${header.join(', ')}]`);
-  }
-
-  const prices: number[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const line  = lines[i].replace(/\r/g, '');
-    if (!line.trim()) continue;
-    const parts = line.split(separator);
-    if (parts.length <= Math.max(iType, iPrice)) continue;
-
-    const type = parts[iType]?.trim() ?? '';
-    const raw  = (parts[iPrice] ?? '').replace(',', '.').trim();
-    // Se non c'è colonna self, assumiamo self-service (alcuni CSV non la hanno)
-    const self = iSelf >= 0 ? parts[iSelf]?.trim() : '1';
-    const p    = parseFloat(raw);
-
-    if (
-      type.toLowerCase().includes('benzina') &&
-      self === '1' &&
-      !isNaN(p) && p >= 1.2 && p <= 3.5
-    ) {
-      prices.push(p);
-    }
-  }
-
-  if (prices.length < 10) {
-    throw new Error(
-      `Rilevazioni insufficienti: trovate ${prices.length} stazioni benzina ` +
-      `(sep="${separator}", header=[${header.slice(0, 5).join(', ')}])`
-    );
-  }
-
-  // Media trimmed: rimuove il 2.5% di outlier in alto e in basso
-  prices.sort((a, b) => a - b);
-  const cut     = Math.max(1, Math.floor(prices.length * 0.025));
-  const trimmed = prices.slice(cut, prices.length - cut);
-  const avg     = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
-
-  return {
-    price: Math.round(avg * 1000) / 1000,
-    stationsCount: trimmed.length,
-    separator,
+  const body = {
+    contents: [{
+      parts: [{
+        text: 'Qual è il prezzo medio attuale della benzina self-service in Italia oggi? Rispondi SOLO con il numero in formato decimale con il punto (esempio: 1.847). Nessuna parola aggiuntiva.',
+      }],
+    }],
+    tools: [{ google_search: {} }],
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 50,
+    },
   };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`Gemini HTTP ${response.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await response.json() as {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+    }>;
+    error?: { message?: string };
+  };
+
+  if (data.error?.message) throw new Error(`Gemini API error: ${data.error.message}`);
+
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+  if (!text) throw new Error('Risposta Gemini vuota');
+
+  const normalized = text.replace(',', '.');
+  const match = normalized.match(/\b(\d+\.\d{2,4})\b/);
+  if (!match) throw new Error(`Prezzo non trovato nella risposta: "${text}"`);
+
+  const price = parseFloat(match[1]);
+  if (isNaN(price) || price < 1.2 || price > 3.5) {
+    throw new Error(`Prezzo fuori range: ${price} (risposta: "${text}")`);
+  }
+
+  return Math.round(price * 1000) / 1000;
 }
