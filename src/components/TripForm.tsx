@@ -121,18 +121,16 @@ export default function TripForm({ onSubmit }: Props) {
         </div>
 
         {/* Data e Orario */}
-        <div className="flex flex-col gap-3">
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Data</label>
-            <input type="date" value={date} min={today} onChange={e => setDate(e.target.value)}
-              className="input-field" />
-            {errors.date && <p className="text-red-400 text-xs mt-1.5">{errors.date}</p>}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1.5">Orario</label>
-            <input type="time" value={time} onChange={e => setTime(e.target.value)}
-              className="input-field" />
-          </div>
+        <div className="card-inner">
+          <label className="block text-sm font-medium text-slate-300 mb-2">Data</label>
+          <input type="date" value={date} min={today} onChange={e => setDate(e.target.value)}
+            className="input-field" />
+          {errors.date && <p className="text-red-400 text-xs mt-1.5">{errors.date}</p>}
+        </div>
+        <div className="card-inner">
+          <label className="block text-sm font-medium text-slate-300 mb-2">Orario</label>
+          <input type="time" value={time} onChange={e => setTime(e.target.value)}
+            className="input-field" />
         </div>
 
         {/* Prezzo benzina — readonly, fonte ufficiale */}
