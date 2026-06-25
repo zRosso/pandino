@@ -6,7 +6,7 @@ import PlaceAutocomplete from './PlaceAutocomplete';
 interface FuelData {
   price: number;
   source: string;
-  stationsCount?: number;
+  error?: string;
   updatedAt: string;
 }
 
@@ -37,12 +37,12 @@ export default function TripForm({ onSubmit }: Props) {
       .then((data: FuelData) => {
         setFuel(data);
         if (data.source === 'default') {
-          setFuelError('Prezzo in tempo reale non disponibile — uso prezzo medio di riferimento');
+          setFuelError(data.error ?? 'Prezzo non disponibile — uso valore di riferimento');
         }
       })
-      .catch(() => {
+      .catch((e: Error) => {
         setFuel({ price: 1.89, source: 'default', updatedAt: '' });
-        setFuelError('Impossibile ottenere il prezzo — uso prezzo medio di riferimento');
+        setFuelError(e.message ?? 'Errore di rete');
       })
       .finally(() => setFuelLoading(false));
   }, []);
