@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-white min-h-screen m-0;
+    font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #root {
+    @apply min-h-screen;
+    width: 100%;
+    max-width: 100%;
+    text-align: left;
+    border: none;
+    display: block;
+  }
+}
+
+@layer components {
+  .seat-btn {
+    @apply relative rounded-t-xl rounded-b-md border-2 transition-all duration-200 cursor-pointer select-none flex items-center justify-center text-xs font-bold;
+    width: 52px;
+    height: 62px;
+  }
+  .seat-available {
+    @apply border-slate-500 bg-slate-700 hover:border-red-500 hover:bg-red-900/40 hover:scale-105;
+  }
+  .seat-selected {
+    @apply border-red-500 bg-red-600 scale-105 shadow-lg shadow-red-500/30;
+  }
+  .seat-taken {
+    @apply border-slate-600 bg-slate-800 cursor-not-allowed opacity-50;
+  }
+  .step-card {
+    @apply bg-slate-900 border border-slate-800 rounded-2xl p-6;
+  }
+  .input-field {
+    @apply w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-colors text-sm;
+  }
+}
