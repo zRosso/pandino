@@ -7,9 +7,10 @@ interface Props {
   passengers: Passenger[];
   onBack: () => void;
   onConfirm: (booking: Booking) => void;
+  isEditing?: boolean;
 }
 
-export default function Summary({ trip, passengers, onBack, onConfirm }: Props) {
+export default function Summary({ trip, passengers, onBack, onConfirm, isEditing }: Props) {
   const costs = calculateCosts(trip, passengers);
   const { usedL, usedKg } = calcTrunkUsage(passengers);
   const pct = trunkPercentage(usedL);
@@ -97,12 +98,12 @@ export default function Summary({ trip, passengers, onBack, onConfirm }: Props) 
       </div>
 
       <div className="flex gap-3">
-        <button onClick={onBack} className="btn-secondary flex-1">← Modifica</button>
+        <button onClick={onBack} className="btn-secondary flex-1">← Indietro</button>
         <button
           onClick={() => onConfirm({ id: '', trip, passengers, createdAt: '', userId: '', userName: '' })}
           className="btn-primary flex-1"
         >
-          ✓ Conferma
+          {isEditing ? '✓ Salva modifiche' : '✓ Conferma'}
         </button>
       </div>
     </div>

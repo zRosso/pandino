@@ -6,10 +6,11 @@ interface Props {
   bookings: Booking[];
   currentUserId: string;
   onDelete: (id: string) => void;
+  onEdit: (booking: Booking) => void;
   onNew: () => void;
 }
 
-export default function BookingsList({ bookings, currentUserId, onDelete, onNew }: Props) {
+export default function BookingsList({ bookings, currentUserId, onDelete, onEdit, onNew }: Props) {
   const userCounts = bookings.reduce<Record<string, { name: string; count: number }>>((acc, b) => {
     if (!acc[b.userId]) acc[b.userId] = { name: b.userName, count: 0 };
     acc[b.userId].count++;
@@ -34,6 +35,11 @@ export default function BookingsList({ bookings, currentUserId, onDelete, onNew 
 
   return (
     <div>
+      {/* New trip button */}
+      <button onClick={onNew} className="btn-primary mb-5">
+        + Nuovo viaggio
+      </button>
+
       {/* Passengers stats */}
       {topUsers.length > 0 && (
         <div className="card mb-5">
@@ -106,10 +112,16 @@ export default function BookingsList({ bookings, currentUserId, onDelete, onNew 
               </div>
 
               {isOwn && (
-                <button onClick={() => onDelete(b.id)}
-                  className="text-xs text-slate-600 hover:text-red-400 transition-colors">
-                  Elimina
-                </button>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => onEdit(b)}
+                    className="text-xs text-slate-500 hover:text-white transition-colors">
+                    ✏ Modifica
+                  </button>
+                  <button onClick={() => onDelete(b.id)}
+                    className="text-xs text-slate-600 hover:text-red-400 transition-colors">
+                    Elimina
+                  </button>
+                </div>
               )}
             </div>
           );

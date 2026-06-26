@@ -98,6 +98,19 @@ export async function insertBooking(booking: Booking): Promise<void> {
   if (error) throw error;
 }
 
+export async function updateBooking(booking: Booking): Promise<void> {
+  const { error } = await supabase.from('bookings').update({
+    from_location:        booking.trip.from,
+    to_location:          booking.trip.to,
+    date:                 booking.trip.date,
+    time:                 booking.trip.time,
+    distance_km:          booking.trip.distanceKm,
+    fuel_price_per_liter: booking.trip.fuelPricePerLiter,
+    passengers:           booking.passengers,
+  }).eq('id', booking.id);
+  if (error) throw error;
+}
+
 export async function removeBooking(id: string): Promise<void> {
   const { error } = await supabase.from('bookings').delete().eq('id', id);
   if (error) throw error;

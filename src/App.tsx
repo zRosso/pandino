@@ -9,7 +9,9 @@ import Summary from './components/Summary';
 import TripForm from './components/TripForm';
 import { supabase } from './supabase';
 import type { Booking, LuggageSize, Passenger, SeatId, Trip } from './types';
-import { fetchBookings, generateId, insertBooking, removeBooking, signOut } from './utils';
+import { fetchBookings, generateId, insertBooking, removeBooking, signOut, updateBooking } from './utils';
+
+const ADMIN_EMAIL = 'gio.giorossi@yahoo.com';
 
 type Step = 'list' | 'trip' | 'seats' | 'luggage' | 'summary' | 'success';
 const WIZARD_STEPS: Step[] = ['trip', 'seats', 'luggage', 'summary'];
@@ -20,22 +22,73 @@ function PandinoApp() {
   const [bookings, setBookings]   = useState<Booking[]>([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
+  const [showSetupLink, setShowSetupLink] = useState(false);
   const [lastBooking, setLastBooking] = useState<Booking | null>(null);
-  const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; email: string } | null>(null);
 
   const [trip, setTrip]               = useState<Trip | null>(null);
   const [selectedSeats, setSelectedSeats] = useState<SeatId[]>([]);
   const [passengers, setPassengers]   = useState<Passenger[]>([]);
 
+  // ID della prenotazione in modifica (null = nuova)
+  const [editingBookingId, setEditingBookingId] = useState<string | null>(null);
+
+  // ── Fuel price ──
+  const [fuelPrice,   setFuelPrice]   = useState<number | null>(null);
+  const [fuelLoading, setFuelLoading] = useState(true);
+
+  // ── Theme ──
+  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
+    (localStorage.getItem('pandino-theme') as 'dark' | 'light') ?? 'dark'
+  );
+
+  // ── Profile dropdown ──
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  const isAdmin = currentUser?.email === ADMIN_EMAIL;
+
+  // Fix: usa document listener invece del backdrop fixed (che veniva bloccato dallo stacking context dell'header)
+  useEffect(() => {
+    if (!profileOpen) return;
+    const close = () => setProfileOpen(false);
+    const timer = setTimeout(() => document.addEventListener('click', close, { once: true }), 0);
+    return () => { clearTimeout(timer); document.removeEventListener('click', close); };
+  }, [profileOpen]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light');
+    localStorage.setItem('pandino-theme', theme);
+  }, [theme]);
+
+  async function loadFuelPrice() {
+    setFuelLoading(true);
+    try {
+      const { data, error: err } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'fuel_price')
+        .single();
+      if (err || !data) { setFuelPrice(1.89); return; }
+      const p = parseFloat(data.value);
+      setFuelPrice(isNaN(p) ? 1.89 : p);
+    } catch {
+      setFuelPrice(1.89);
+    } finally {
+      setFuelLoading(false);
+    }
+  }
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
         setCurrentUser({
-          id: data.user.id,
-          name: (data.user.user_metadata?.name as string) ?? data.user.email ?? 'Utente',
+          id:    data.user.id,
+          name:  (data.user.user_metadata?.name as string) ?? data.user.email ?? 'Utente',
+          email: data.user.email ?? '',
         });
       }
     });
+    loadFuelPrice();
     fetchBookings()
       .then(setBookings)
       .catch(e => setError(e.message))
@@ -43,7 +96,17 @@ function PandinoApp() {
   }, []);
 
   function startNew() {
+    setEditingBookingId(null);
     setTrip(null); setSelectedSeats([]); setPassengers([]);
+    loadFuelPrice();
+    setStep('trip');
+  }
+
+  function startEdit(booking: Booking) {
+    setEditingBookingId(booking.id);
+    setTrip(booking.trip);
+    setSelectedSeats(booking.passengers.map(p => p.seat));
+    setPassengers(booking.passengers);
     setStep('trip');
   }
 
@@ -66,24 +129,47 @@ function PandinoApp() {
 
   async function handleConfirm(booking: Booking) {
     if (!currentUser) { setError('Sessione scaduta — effettua il login di nuovo'); return; }
-    const full: Booking = {
-      ...booking,
-      id: generateId(),
-      createdAt: new Date().toISOString(),
-      userId: currentUser.id,
-      userName: currentUser.name,
-    };
-    try {
-      await insertBooking(full);
-      setBookings(prev => [full, ...prev]);
-      setLastBooking(full);
-      setStep('success');
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Errore nel salvataggio';
-      if (msg.includes('user_id') || msg.includes('user_name') || msg.includes('schema cache')) {
-        setError('Devi eseguire la migrazione v2 su Supabase — copia il file supabase-schema-v2.sql nel SQL Editor');
-      } else {
-        setError(msg);
+
+    if (editingBookingId) {
+      // Modalità modifica
+      const updated: Booking = {
+        ...booking,
+        id: editingBookingId,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        createdAt: bookings.find(b => b.id === editingBookingId)?.createdAt ?? new Date().toISOString(),
+      };
+      try {
+        await updateBooking(updated);
+        setBookings(prev => prev.map(b => b.id === editingBookingId ? updated : b));
+        setEditingBookingId(null);
+        setStep('list');
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Errore nel salvataggio');
+      }
+    } else {
+      // Nuova prenotazione
+      const full: Booking = {
+        ...booking,
+        id: generateId(),
+        createdAt: new Date().toISOString(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+      };
+      try {
+        await insertBooking(full);
+        setBookings(prev => [full, ...prev]);
+        setLastBooking(full);
+        setStep('success');
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Errore nel salvataggio';
+        if (msg.includes('user_id') || msg.includes('user_name') || msg.includes('schema cache') || msg.includes('does not exist')) {
+          setShowSetupLink(true);
+          setError('Database non configurato — esegui supabase-setup-complete.sql nel SQL Editor di Supabase');
+        } else {
+          setShowSetupLink(false);
+          setError(msg);
+        }
       }
     }
   }
@@ -99,6 +185,11 @@ function PandinoApp() {
 
   const wizardIndex = WIZARD_STEPS.indexOf(step);
   const inWizard = wizardIndex !== -1;
+  const isEditing = !!editingBookingId;
+
+  const todayLabel = new Date().toLocaleDateString('it-IT', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  });
 
   return (
     <div className="min-h-dvh bg-slate-950 flex flex-col">
@@ -145,22 +236,51 @@ function PandinoApp() {
             </div>
           )}
 
-          {/* Right side */}
-          <div className="flex items-center gap-2">
-            {step === 'list' && (
-              <button onClick={startNew} className="bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors">
-                + Nuovo
-              </button>
-            )}
+          {/* Right: date + profile dropdown */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-slate-400 tabular-nums">{todayLabel}</span>
+
             {currentUser && (
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-red-400">
+              <div className="relative">
+                {/* Avatar button */}
+                <button
+                  onClick={() => setProfileOpen(p => !p)}
+                  className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-red-400 hover:border-slate-500 transition-colors"
+                >
                   {currentUser.name.charAt(0).toUpperCase()}
-                </div>
-                <button onClick={async () => { await signOut(); window.location.reload(); }}
-                  className="hidden sm:block text-xs text-slate-600 hover:text-slate-400 transition-colors">
-                  Esci
                 </button>
+                {/* Dropdown — stopPropagation per non triggerare il listener close sul document */}
+                {profileOpen && (
+                  <div
+                    className="absolute right-0 top-10 w-56 z-50 rounded-xl shadow-2xl overflow-hidden"
+                    style={{ backgroundColor: 'var(--c-surface)', border: '1px solid var(--c-border-in)' }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {/* User info */}
+                    <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--c-border-60)' }}>
+                      <p className="text-sm font-semibold text-white truncate">{currentUser.name}</p>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">{currentUser.email}</p>
+                    </div>
+                    {/* Theme toggle */}
+                    <button
+                      onClick={() => { setTheme(t => t === 'dark' ? 'light' : 'dark'); setProfileOpen(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 transition-colors text-left"
+                    >
+                      <span className="text-base leading-none">{theme === 'dark' ? '☀️' : '🌙'}</span>
+                      <span>{theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}</span>
+                    </button>
+                    {/* Logout */}
+                    <div style={{ borderTop: '1px solid var(--c-border-60)' }}>
+                      <button
+                        onClick={async () => { setProfileOpen(false); await signOut(); window.location.reload(); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors text-left"
+                      >
+                        <span className="text-base leading-none">🚪</span>
+                        <span>Esci</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -171,7 +291,17 @@ function PandinoApp() {
       {error && (
         <div className="bg-red-950/70 border-b border-red-900 px-4 py-3 text-sm text-red-300 text-center">
           ⚠️ {error}
-          <button onClick={() => setError(null)} className="ml-3 text-red-500 hover:text-red-300 transition-colors text-xs underline">
+          {showSetupLink && (
+            <a
+              href={`https://supabase.com/dashboard/project/${(import.meta.env.VITE_SUPABASE_URL as string).split('//')[1].split('.')[0]}/sql/new`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-2 text-amber-400 hover:text-amber-300 transition-colors text-xs underline font-medium"
+            >
+              Apri SQL Editor →
+            </a>
+          )}
+          <button onClick={() => { setError(null); setShowSetupLink(false); }} className="ml-3 text-red-500 hover:text-red-300 transition-colors text-xs underline">
             Chiudi
           </button>
         </div>
@@ -186,11 +316,26 @@ function PandinoApp() {
               <p className="text-slate-500 text-sm">Caricamento...</p>
             </div>
           ) : (
-            <BookingsList bookings={bookings} currentUserId={currentUser?.id ?? ''} onDelete={handleDelete} onNew={startNew} />
+            <BookingsList
+              bookings={bookings}
+              currentUserId={currentUser?.id ?? ''}
+              onDelete={handleDelete}
+              onEdit={startEdit}
+              onNew={startNew}
+            />
           )
         )}
 
-        {step === 'trip' && <TripForm onSubmit={t => { setTrip(t); setStep('seats'); }} />}
+        {step === 'trip' && (
+          <TripForm
+            onSubmit={t => { setTrip(t); setStep('seats'); }}
+            fuelPrice={fuelPrice}
+            fuelLoading={fuelLoading}
+            isAdmin={isAdmin}
+            onFuelPriceChange={setFuelPrice}
+            initialTrip={isEditing ? trip ?? undefined : undefined}
+          />
+        )}
 
         {step === 'seats' && trip && (
           <SeatSelector trip={trip} selectedSeats={selectedSeats}
@@ -203,7 +348,9 @@ function PandinoApp() {
         )}
 
         {step === 'summary' && trip && (
-          <Summary trip={trip} passengers={passengers} onBack={() => setStep('luggage')} onConfirm={handleConfirm} />
+          <Summary trip={trip} passengers={passengers}
+            onBack={() => setStep('luggage')} onConfirm={handleConfirm}
+            isEditing={isEditing} />
         )}
 
         {step === 'success' && lastBooking && (
